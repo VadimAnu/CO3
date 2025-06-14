@@ -142,9 +142,9 @@ async def main():
         try:
 
             stime = time.time()
-            combinations = create_combinations(pools, 1)
+            combinations = await asyncio.to_thread(create_combinations, pools, 1)
 
-            arbitrages = find_arbitrage(combinations, pools)
+            arbitrages = await asyncio.to_thread(find_arbitrage, combinations, pools)
 
             swapped = False
             for arbitrage in arbitrages:
