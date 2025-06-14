@@ -14,6 +14,24 @@ from traceback import extract_tb
 host = "http://localhost:8843"
 ws_host = host.replace("http", "ws")
 
+# Reusable aiohttp session for HTTP and WebSocket requests
+_session = None
+
+
+async def _get_session():
+    """Create or return the module-level aiohttp.ClientSession."""
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession()
+    return _session
+
+
+async def close_session():
+    """Close the module-level aiohttp session."""
+    global _session
+    if _session is not None and not _session.closed:
+        await _session.close()
+
 
 async def wallet_and_private_key():
     async with aiohttp.ClientSession() as session:
@@ -29,9 +47,9 @@ wallet, priv_key_minter = asyncio.run(wallet_and_private_key())
 ten_in_18 = Decimal("10") ** Decimal("18")
 
 async def _request_json(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            return await resp.json()
+    session = await _get_session()
+    async with session.get(url) as resp:
+        return await resp.json()
 
 def format_e(x):
     if "e-" in str(x):
@@ -184,6 +202,44 @@ def get_pools():
 
 async def pools_ws():
     url = ws_host + "/hamster/pools/ws"
+    while True:
+        try:
+            session = await _get_session()
+            async with session.ws_connect(url) as ws:
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        data = json.loads(msg.data)
+                        res = data.get("result", data)
+                        yield _parse_pools(res)
+                    elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                        break
+        except Exception as err:
+            logger.error([err])
+            await asyncio.sleep(1)
+    pools = {}
+    for r in res:
+        symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
+        symbol2 = f'{r["coin1"]["symbol"]}/{r["coin0"]["symbol"]}'
+
+        size0 = Decimal(r["coin0"]["reserve"]) / ten_in_18
+        size1 = Decimal(r["coin1"]["reserve"]) / ten_in_18
+
+        pools[symbol1] = {
+            "price": size1 / size0,
+            "size0": size0,
+            "size1": size1
+        }
+
+        pools[symbol2] = {
+            "price": size0 / size1,
+            "size0": size1,
+            "size1": size0
+        }
+
+    return pools
+
+def get_pools():
+    return asyncio.run(get_pools_async())
     while True:
         try:
             async with aiohttp.ClientSession() as session:
