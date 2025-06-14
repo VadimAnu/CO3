@@ -240,6 +240,46 @@ async def pools_ws():
 
 def get_pools():
     return asyncio.run(get_pools_async())
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(url) as ws:
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            res = data.get("result", data)
+                            yield _parse_pools(res)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+        except Exception as err:
+            logger.error([err])
+            await asyncio.sleep(1)
+    # The code below is kept for reference but is not used with the
+    # current async generator implementation.
+    # pools = {}
+    # for r in res:
+    #     symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
+    #     symbol2 = f'{r["coin1"]["symbol"]}/{r["coin0"]["symbol"]}'
+    #
+    #     size0 = Decimal(r["coin0"]["reserve"]) / ten_in_18
+    #     size1 = Decimal(r["coin1"]["reserve"]) / ten_in_18
+    #
+    #     pools[symbol1] = {
+    #         "price": size1 / size0,
+    #         "size0": size0,
+    #         "size1": size1
+    #     }
+    #
+    #     pools[symbol2] = {
+    #         "price": size0 / size1,
+    #         "size0": size1,
+    #         "size1": size0
+    #     }
+    #
+    # return pools
+
+def get_pools():
+    return asyncio.run(get_pools_async())
 
 def get_price(symbol, size=0, type="output"):
     if size != 0:
@@ -363,7 +403,8 @@ def cancel_order(orderId):
                            f"&id={orderId}")
 
         return send_transaction(transaction.json()['result'])
-    except: pass
+    except Exception as e:
+        logger.error(e)
 
 async def swap_pool_async(path, size, gas_price=None):
     size = int(Decimal(size) * ten_in_18)
