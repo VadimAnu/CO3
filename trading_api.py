@@ -14,6 +14,7 @@ from traceback import extract_tb
 host = "http://localhost:8843"
 ws_host = host.replace("http", "ws")
 
+
 async def wallet_and_private_key():
     async with aiohttp.ClientSession() as session:
         async with session.get(host + f"/unsf/get_wallet?mnemonic={mnemonic}") as resp:
@@ -197,6 +198,30 @@ async def pools_ws():
         except Exception as err:
             logger.error([err])
             await asyncio.sleep(1)
+    pools = {}
+    for r in res:
+        symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
+        symbol2 = f'{r["coin1"]["symbol"]}/{r["coin0"]["symbol"]}'
+
+        size0 = Decimal(r["coin0"]["reserve"]) / ten_in_18
+        size1 = Decimal(r["coin1"]["reserve"]) / ten_in_18
+
+        pools[symbol1] = {
+            "price": size1 / size0,
+            "size0": size0,
+            "size1": size1
+        }
+
+        pools[symbol2] = {
+            "price": size0 / size1,
+            "size0": size1,
+            "size1": size0
+        }
+
+    return pools
+
+def get_pools():
+    return asyncio.run(get_pools_async())
 
 def get_price(symbol, size=0, type="output"):
     if size != 0:
