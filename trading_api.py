@@ -1,5 +1,6 @@
 import time
 import asyncio
+import json
 from logs import logger
 
 import aiohttp
@@ -11,6 +12,8 @@ from sys import exc_info
 from traceback import extract_tb
 
 host = "http://localhost:8843"
+ws_host = host.replace("http", "ws")
+
 
 async def wallet_and_private_key():
     async with aiohttp.ClientSession() as session:
@@ -145,12 +148,56 @@ def get_coins_id():
         if s2 not in coins_id: coins_id[s2] = r["coin1"]["id"]
 
     return coins_id
+
 coins_id = get_coins_id()
+
+def _parse_pools(res):
+    pools = {}
+    for r in res:
+        symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
+        symbol2 = f'{r["coin1"]["symbol"]}/{r["coin0"]["symbol"]}'
+
+        size0 = Decimal(r["coin0"]["reserve"]) / ten_in_18
+        size1 = Decimal(r["coin1"]["reserve"]) / ten_in_18
+
+        pools[symbol1] = {
+            "price": size1 / size0,
+            "size0": size0,
+            "size1": size1,
+        }
+
+        pools[symbol2] = {
+            "price": size0 / size1,
+            "size0": size1,
+            "size1": size0,
+        }
+
+    return pools
 
 async def get_pools_async():
     res = await _request_json(host + "/hamster/get_pools")
     res = res["result"]
+    return _parse_pools(res)
 
+def get_pools():
+    return asyncio.run(get_pools_async())
+
+async def pools_ws():
+    url = ws_host + "/hamster/pools/ws"
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(url) as ws:
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            res = data.get("result", data)
+                            yield _parse_pools(res)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+        except Exception as err:
+            logger.error([err])
+            await asyncio.sleep(1)
     pools = {}
     for r in res:
         symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'

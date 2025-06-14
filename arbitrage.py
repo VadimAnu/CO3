@@ -140,10 +140,10 @@ def find_arbitrage(combinations, pools):
 async def main():
     global list_msg
 
-    while True:
+
+    async for pools in trading_api.pools_ws():
         try:
-            await asyncio.sleep(1)
-            pools = await trading_api.get_pools_async()
+
             stime = time.time()
             combinations = create_combinations(pools, 1)
 
