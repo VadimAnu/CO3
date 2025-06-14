@@ -9,7 +9,6 @@ import misc
 from sys import exc_info
 from traceback import extract_tb
 
-count = 0
 
 list_msg = []
 
@@ -54,7 +53,6 @@ def create_combinations(pools, count_th=1):
 
     # coin_sell > coin_buy | USDX → QUOTA → BIP → USDX
     def start(symbols, symbols_th):
-        global count
 
         for symbol in symbols_th:
             coin_buy = symbol.split("/")[0]
@@ -76,7 +74,6 @@ def create_combinations(pools, count_th=1):
                                 if coin_buy2 == coin_sell1 and coin_sell2 == coin_sell:
                                     combinations.append([symbol, symbol1, symbol2])
 
-            count += 1
 
     count_symbols_th = int(count_symbols / count_th)
     if count_symbols_th * count_th < count_symbols: count_symbols_th += 1
