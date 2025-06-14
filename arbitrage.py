@@ -1,6 +1,7 @@
 import trading_api
 import threading
 import time
+import asyncio
 from config import *
 from logs import logger
 import misc
@@ -136,13 +137,13 @@ def find_arbitrage(combinations, pools):
 
     return arbitrage
 
-def main():
+async def main():
     global list_msg
 
     while True:
         try:
-            time.sleep(1)
-            pools = trading_api.get_pools()
+            await asyncio.sleep(1)
+            pools = await trading_api.get_pools_async()
             stime = time.time()
             combinations = create_combinations(pools, 1)
 
@@ -163,11 +164,11 @@ def main():
                 initial_size = arbitrage['initial_size']
 
                 if not swapped and enable_swap:
-                        txId = trading_api.swap_pool(trading_api.get_path(swap_pool), initial_size)
-                        time.sleep(5)
+                        txId = await trading_api.swap_pool_async(trading_api.get_path(swap_pool), initial_size, gas_price=gas_price)
+                        await asyncio.sleep(tx_initial_delay)
 
                         for i in range(10):
-                            tx = trading_api.get_transaction(txId)
+                            tx = await trading_api.get_transaction_async(txId)
                             if "error" not in tx:
                                 start_size = round(float(tx["data"]["data"]["value_to_sell"]), 6)
                                 end_size = round(float(tx["data"]["data"]["value_to_buy"]), 6)
@@ -189,17 +190,17 @@ def main():
                                 break
                             else:
                                 logger.warning(f"ожидаем подтверждение транзакции {txId} | {tx}")
-                                time.sleep(3)
+                                await asyncio.sleep(tx_poll_interval)
 
                         swapped = True
             # break
         except Exception as err:
             logger.error([err, extract_tb(exc_info()[2])])
-            time.sleep(3)
+            await asyncio.sleep(3)
 
 def start():
-    threading.Thread(target=main).start()
-    threading.Thread(target=send_msg).start()
+    threading.Thread(target=send_msg, daemon=True).start()
+    asyncio.run(main())
 
 if __name__ == '__main__':
     start()
