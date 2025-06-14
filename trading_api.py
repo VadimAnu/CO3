@@ -1,6 +1,9 @@
 import time
+import asyncio
+import json
 from logs import logger
 
+import aiohttp
 import requests
 from config import *
 from decimal import Decimal
@@ -9,17 +12,25 @@ from sys import exc_info
 from traceback import extract_tb
 
 host = "http://localhost:8843"
+ws_host = host.replace("http", "ws")
 
-def wallet_and_private_key():
-    res = requests.get(host + f"/unsf/get_wallet?mnemonic={mnemonic}").json()
+async def wallet_and_private_key():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(host + f"/unsf/get_wallet?mnemonic={mnemonic}") as resp:
+            res = await resp.json()
     if "result" in res:
         return res["result"]["Address"], res["result"]["PrivateKey"]
     else:
         print("Укажите данные от счета..")
         return None, None
 
-wallet, priv_key_minter = wallet_and_private_key()
+wallet, priv_key_minter = asyncio.run(wallet_and_private_key())
 ten_in_18 = Decimal("10") ** Decimal("18")
+
+async def _request_json(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            return await resp.json()
 
 def format_e(x):
     if "e-" in str(x):
@@ -34,14 +45,24 @@ def format_e(x):
     if "." in str(x) and int(x) == float(x): return int(x)
     return x
 
+async def get_transaction_async(tx):
+    url = f"https://explorer-api.minter.network/api/v2/transactions/{tx}"
+    return await _request_json(url)
+
 def get_transaction(tx):
-    res = requests.get(f"https://explorer-api.minter.network/api/v2/transactions/{tx}")
-    return res.json()
+    return asyncio.run(get_transaction_async(tx))
 
-def send_transaction(transaction):
-    res = requests.get(host + f"/hamster/send_transaction/{transaction}?payload={message_transaction}").json()
+async def send_transaction_async(transaction, gas_price=None, gas_coin=None):
+    url = host + f"/hamster/send_transaction/{transaction}?payload={message_transaction}"
+    if gas_price is None:
+        gas_price = globals().get("gas_price", None)
+    if gas_price is not None:
+        url += f"&gas_price={gas_price}"
+    if gas_coin:
+        url += f"&gas_coin={gas_coin}"
+    res = await _request_json(url)
 
-    if "result" not in res or res["result"]["code"] != 0:
+    if "result" not in res or res["result"].get("code", 0) != 0:
         msg = ""
         if "Wanted" in res["error"]:
             ws = res["error"].split(" ")
@@ -55,6 +76,9 @@ def send_transaction(transaction):
         raise Exception(f"{msg} {res}")
 
     return res["result"]["hash"]
+
+def send_transaction(transaction, gas_price=None, gas_coin=None):
+    return asyncio.run(send_transaction_async(transaction, gas_price, gas_coin))
 
 def order_format(symbol, order):
     try:
@@ -123,11 +147,10 @@ def get_coins_id():
         if s2 not in coins_id: coins_id[s2] = r["coin1"]["id"]
 
     return coins_id
+
 coins_id = get_coins_id()
 
-def get_pools():
-    res = requests.get(host + "/hamster/get_pools").json()["result"]
-
+def _parse_pools(res):
     pools = {}
     for r in res:
         symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
@@ -139,16 +162,41 @@ def get_pools():
         pools[symbol1] = {
             "price": size1 / size0,
             "size0": size0,
-            "size1": size1
+            "size1": size1,
         }
 
         pools[symbol2] = {
             "price": size0 / size1,
             "size0": size1,
-            "size1": size0
+            "size1": size0,
         }
 
     return pools
+
+async def get_pools_async():
+    res = await _request_json(host + "/hamster/get_pools")
+    res = res["result"]
+    return _parse_pools(res)
+
+def get_pools():
+    return asyncio.run(get_pools_async())
+
+async def pools_ws():
+    url = ws_host + "/hamster/pools/ws"
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(url) as ws:
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            res = data.get("result", data)
+                            yield _parse_pools(res)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+        except Exception as err:
+            logger.error([err])
+            await asyncio.sleep(1)
 
 def get_price(symbol, size=0, type="output"):
     if size != 0:
@@ -274,20 +322,21 @@ def cancel_order(orderId):
         return send_transaction(transaction.json()['result'])
     except: pass
 
-def swap_pool(path, size):
+async def swap_pool_async(path, size, gas_price=None):
     size = int(Decimal(size) * ten_in_18)
 
-    # route1 = get_route_input(f"{symbol.split('/')[0]}/{symbol.split('/')[1]}", size)
-    # min_value_buy = route1["result"]
+    url = (host + f"/unsf/new_tx/sell_swap_pool?"
+           f"priv_key={priv_key_minter}"
+           f"&value_sell={size}"
+           f"&min_value_buy=1"
+           f"&route={path}")
 
-    transaction = requests.get(
-        host + f"/unsf/new_tx/sell_swap_pool?"
-               f"priv_key={priv_key_minter}"
-               f"&value_sell={size}"
-               f"&min_value_buy=1"
-               f"&route={path}")
+    transaction = await _request_json(url)
 
-    return send_transaction(transaction.json()['result'])
+    return await send_transaction_async(transaction['result'], gas_price=gas_price)
+
+def swap_pool(path, size, gas_price=None):
+    return asyncio.run(swap_pool_async(path, size, gas_price))
 
 def get_path(coins):
     coins = coins.replace(" ", "").split(">")
@@ -298,4 +347,4 @@ def get_path(coins):
     return path[:-1]
 
 if __name__ == '__main__':
-    print(buy_market("BNB/USDTE", 50))
+    pass
