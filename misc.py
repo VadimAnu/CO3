@@ -6,6 +6,7 @@ from traceback import extract_tb
 import time
 import Settings
 import requests
+from logs import logger
 
 def getSymbols():
     symbols = ["-"]
@@ -39,7 +40,8 @@ def getExchangeInfo():
                         else:
                             minQty = int(str(minQty).split("-")[-1])
 
-                    except:
+                    except Exception as e:
+                        logger.error(e)
                         minQty = 0
 
                 elif filter["filterType"] == "PRICE_FILTER":
@@ -54,7 +56,8 @@ def getExchangeInfo():
                         else:
                             minPrice = int(str(minPrice).split("-")[-1])
 
-                    except:
+                    except Exception as e:
+                        logger.error(e)
                         minPrice = 0
 
                 elif filter["filterType"] == "MARKET_LOT_SIZE":
@@ -84,8 +87,8 @@ def transformationPrice(price, x):
         drob = price.split(".")[1]
 
         price = f"{full}.{drob[:x]}"
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     if "e" in str(price):
         return 0
@@ -121,7 +124,8 @@ def send_tg(msg):
                 "text": "<b>SPOT</b>\n\n"+ str(msg)
             }, timeout=10)
             break
-        except:
+        except Exception as e:
+            logger.error(e)
             print(f"Не удалось отправить сигнал, повтор {i}!")
             time.sleep(0.3)
 
@@ -170,7 +174,8 @@ def send_tg_arbitrage(msg):
                 "text": str(msg)
             }, timeout=10)
             break
-        except:
+        except Exception as e:
+            logger.error(e)
             print(f"Не удалось отправить сигнал, повтор {i+1}!")
             time.sleep(0.3)
 
