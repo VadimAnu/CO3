@@ -10,6 +10,7 @@ import misc
 from sys import exc_info
 from traceback import extract_tb
 import trading_api
+from logs import logger
 
 #pyuic5 main.ui -o qUI.py
 
@@ -104,8 +105,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 settings = Settings.getSettings()
                 del settings[symbol]
                 Settings.saveSettings(settings)
-            except:
-                pass
+            except Exception as e:
+                logger.error(e)
 
             misc.send_msg(f"{symbol} включено!")
 
@@ -133,8 +134,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 settings = Settings.getSettings()
                 del settings[symbol]
                 Settings.saveSettings(settings)
-            except:
-                pass
+            except Exception as e:
+                logger.error(e)
 
             misc.send_msg(f"{symbol} отключено!")
 

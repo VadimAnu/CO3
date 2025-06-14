@@ -2,18 +2,19 @@ import ast
 import json
 import os
 import time
+from logs import logger
 
 path_data = "D:/PythonPrj/talborProject/binance22 TgInvest"
 
 try:
     os.mkdir("data")
-except:
-    pass
+except Exception as e:
+    logger.error(e)
 
 try:
     os.mkdir("data/logs")
-except:
-    pass
+except Exception as e:
+    logger.error(e)
 
 title_log = f"{int(time.time() * 100000)}.txt"
 def saveLog(log):
@@ -33,8 +34,8 @@ def get_data():
         f = open(f"data.txt")
         data = ast.literal_eval(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     return data
 
@@ -49,8 +50,8 @@ def getCouples():
         f = open("data/couples.txt")
         settings = ast.literal_eval(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     return settings
 
@@ -65,8 +66,8 @@ def getSettings():
         f = open("data/settings.txt")
         settings = ast.literal_eval(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
     return settings
 
 def saveKlines(symbol, klines, timeFrame):
@@ -80,8 +81,8 @@ def getKlines(symbol, timeFrame):
         f = open(f"data/klines/{symbol}_{timeFrame}.txt")
         klines = ast.literal_eval(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     return klines
 
@@ -101,8 +102,8 @@ def getAPI():
         f = open("data/API.txt")
         API = ast.literal_eval(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     return API
 
@@ -117,8 +118,8 @@ def getStats():
         f = open(f"data/stats.txt")
         stats = f.read().split("\n")
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     return stats
 
@@ -133,8 +134,8 @@ def get_key():
         f = open(f"data/key.txt")
         key = int(f.read())
         f.close()
-    except:
-        pass
+    except Exception as e:
+        logger.error(e)
 
     if key:
         return key
