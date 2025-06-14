@@ -23,3 +23,8 @@ arbitrage_setups = [
     }
 ]
 
+# default gas price to accelerate transaction inclusion
+# adjustable values for transaction confirmation polling
+gas_price = 1
+tx_initial_delay = 1  # seconds to wait after transaction submission
+tx_poll_interval = 1  # seconds between transaction status polls
