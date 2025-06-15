@@ -25,7 +25,7 @@ def saveLog(log):
 
 def save_data(data):
     f = open(f"data.txt", "w")
-    f.write(str(couples))
+    f.write(str(data))
     f.close()
 
 def get_data():
