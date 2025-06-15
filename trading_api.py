@@ -203,6 +203,40 @@ async def get_pools_async():
 def get_pools():
     return asyncio.run(get_pools_async())
 
+
+def get_exchange_information():
+    """Return simplified exchange information based on available pools."""
+    res = requests.get(host + "/hamster/get_pools").json()["result"]
+
+    symbols = []
+    for r in res:
+        base = r["coin0"]["symbol"]
+        quote = r["coin1"]["symbol"]
+
+        common_filters = [
+            {"filterType": "LOT_SIZE", "minQty": "1"},
+            {"filterType": "PRICE_FILTER", "tickSize": "0.00000001"},
+            {"filterType": "MARKET_LOT_SIZE", "minQty": "1"},
+        ]
+
+        symbols.append({
+            "symbol": f"{base}/{quote}",
+            "status": "TRADING",
+            "baseAsset": base,
+            "quoteAsset": quote,
+            "filters": common_filters,
+        })
+
+        symbols.append({
+            "symbol": f"{quote}/{base}",
+            "status": "TRADING",
+            "baseAsset": quote,
+            "quoteAsset": base,
+            "filters": common_filters,
+        })
+
+    return {"symbols": symbols}
+
 async def pools_ws():
     url = ws_host + "/hamster/pools/ws"
     while True:

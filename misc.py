@@ -7,6 +7,18 @@ import time
 import Settings
 import requests
 from logs import logger
+import trading_api
+
+try:
+    import adds_api
+except ImportError:  # fallback if optional module is missing
+    class adds_api:
+        @staticmethod
+        def get_adds():
+            return ""
+
+# Default informational text for signals
+info_signal = ""
 
 def getSymbols():
     symbols = ["-"]
