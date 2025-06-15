@@ -164,7 +164,8 @@ def get_coins_id():
         s1 = r["coin0"]["symbol"]
         s2 = r["coin1"]["symbol"]
 
-        if "coin2" in res: print(r)
+        if "coin2" in r:
+            pass
         if s1 not in coins_id: coins_id[s1] = r["coin0"]["id"]
         if s2 not in coins_id: coins_id[s2] = r["coin1"]["id"]
 
