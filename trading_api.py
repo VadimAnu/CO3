@@ -167,7 +167,7 @@ def order_format(symbol, order):
             "status": order["status"]
         }
     except Exception as err:
-        print(order, err, extract_tb(exc_info()[2]))
+        logger.error((order, err, extract_tb(exc_info()[2])))
 
 def send_order(symbol, transaction):
     tx = send_transaction(transaction)
@@ -216,7 +216,8 @@ def get_coins_id():
         s1 = r["coin0"]["symbol"]
         s2 = r["coin1"]["symbol"]
 
-        if "coin2" in res: print(r)
+        if "coin2" in r:
+            pass
         if s1 not in coins_id: coins_id[s1] = r["coin0"]["id"]
         if s2 not in coins_id: coins_id[s2] = r["coin1"]["id"]
 
@@ -271,7 +272,7 @@ async def pools_ws():
         except Exception as err:
             logger.error([err])
             await asyncio.sleep(1)
-=======
+# =======
 
 coins_id = get_coins_id()
 
