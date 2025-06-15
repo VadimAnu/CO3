@@ -197,18 +197,6 @@ async def main():
 def start():
     threading.Thread(target=send_msg, daemon=True).start()
     asyncio.run(main())
-                                logger.warning(f"ожидаем подтверждение транзакции {txId} | {tx}")
-                                await asyncio.sleep(tx_poll_interval)
-
-                        swapped = True
-            # break
-        except Exception as err:
-            logger.error([err, extract_tb(exc_info()[2])])
-            await asyncio.sleep(3)
-
-def start():
-    threading.Thread(target=send_msg, daemon=True).start()
-    asyncio.run(main())
 
 
 if __name__ == '__main__':
