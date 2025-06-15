@@ -58,7 +58,6 @@ def start_bot():
         price_close = trading_api.get_price(symbol)
         # if type_grid == "reverse": profit = profit * price_close
 
-        db.add_profit_all(profit)
         Settings.saveStats(profit)
 
         profit_coin = ""
@@ -96,14 +95,11 @@ def start_bot():
                      f"Чистая прибыль: <b>{profit}$</b>\n"
                      f"Комиссия биржи: <b>{com}$</b>")
         misc.send_msg(f"{symbol} позиция закрыта {profit} {grid['positionAmt']}")
-        if history_api:
-            db.save_history_spot(symbol, grid["time_open"], time_close, grid["openPrice"], price_close, grid["entryPrice"], profit, grid["positionAmt"])
 
         # возврат кредитных средств
         if save_mode and settings[symbol]["insufficient"]:
             balance = trading_api.get_balance(wallet)
             if balance + 1 >= settings[symbol]["creditSize"]:
-                db_save.change_status_user(API_KEY, "return")
                 misc.send_tg(f"Страховочные средства возвращены")
 
                 settings[symbol]["creditSize"] = 0
