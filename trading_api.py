@@ -1,3 +1,4 @@
+
 import time
 import asyncio
 import json
@@ -11,6 +12,26 @@ from decimal import Decimal
 from sys import exc_info
 from traceback import extract_tb
 
+host = "http://localhost:8843"
+ws_host = host.replace("http", "ws")
+
+async def wallet_and_private_key():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(host + f"/unsf/get_wallet?mnemonic={mnemonic}") as resp:
+            res = await resp.json()
+    if "result" in res:
+        return res["result"]["Address"], res["result"]["PrivateKey"]
+    else:
+        print("Укажите данные от счета..")
+        return None, None
+
+wallet, priv_key_minter = asyncio.run(wallet_and_private_key())
+ten_in_18 = Decimal("10") ** Decimal("18")
+
+async def _request_json(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            return await resp.json()
 host = "http://localhost:8843"
 ws_host = host.replace("http", "ws")
 
@@ -64,6 +85,40 @@ def format_e(x):
     if "." in str(x) and int(x) == float(x): return int(x)
     return x
 
+async def get_transaction_async(tx):
+    url = f"https://explorer-api.minter.network/api/v2/transactions/{tx}"
+    return await _request_json(url)
+
+def get_transaction(tx):
+    return asyncio.run(get_transaction_async(tx))
+
+async def send_transaction_async(transaction, gas_price=None, gas_coin=None):
+    url = host + f"/hamster/send_transaction/{transaction}?payload={message_transaction}"
+    if gas_price is None:
+        gas_price = globals().get("gas_price", None)
+    if gas_price is not None:
+        url += f"&gas_price={gas_price}"
+    if gas_coin:
+        url += f"&gas_coin={gas_coin}"
+    res = await _request_json(url)
+
+    if "result" not in res or res["result"].get("code", 0) != 0:
+        msg = ""
+        if "Wanted" in res["error"]:
+            ws = res["error"].split(" ")
+            for i, w in enumerate(ws):
+                if w == "Wanted" and i + 2 <= len(ws) - 1:
+                    s = ws[i + 1]
+                    c = ws[i + 2]
+
+                    msg = f"Недостаточно средств на счете {Decimal(s) / ten_in_18} {c}"
+
+        raise Exception(f"{msg} {res}")
+
+    return res["result"]["hash"]
+
+def send_transaction(transaction, gas_price=None, gas_coin=None):
+    return asyncio.run(send_transaction_async(transaction, gas_price, gas_coin))
 async def get_transaction_async(tx):
     url = f"https://explorer-api.minter.network/api/v2/transactions/{tx}"
     return await _request_json(url)
@@ -166,6 +221,57 @@ def get_coins_id():
         if s2 not in coins_id: coins_id[s2] = r["coin1"]["id"]
 
     return coins_id
+
+coins_id = get_coins_id()
+
+def _parse_pools(res):
+    pools = {}
+    for r in res:
+        symbol1 = f'{r["coin0"]["symbol"]}/{r["coin1"]["symbol"]}'
+        symbol2 = f'{r["coin1"]["symbol"]}/{r["coin0"]["symbol"]}'
+
+        size0 = Decimal(r["coin0"]["reserve"]) / ten_in_18
+        size1 = Decimal(r["coin1"]["reserve"]) / ten_in_18
+
+        pools[symbol1] = {
+            "price": size1 / size0,
+            "size0": size0,
+            "size1": size1,
+        }
+
+        pools[symbol2] = {
+            "price": size0 / size1,
+            "size0": size1,
+            "size1": size0,
+        }
+
+    return pools
+
+async def get_pools_async():
+    res = await _request_json(host + "/hamster/get_pools")
+    res = res["result"]
+    return _parse_pools(res)
+
+def get_pools():
+    return asyncio.run(get_pools_async())
+
+async def pools_ws():
+    url = ws_host + "/hamster/pools/ws"
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(url) as ws:
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            res = data.get("result", data)
+                            yield _parse_pools(res)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+        except Exception as err:
+            logger.error([err])
+            await asyncio.sleep(1)
+=======
 
 coins_id = get_coins_id()
 
@@ -429,6 +535,6 @@ def get_path(coins):
         path += f"{coins_id[coin]},"
 
     return path[:-1]
-
+  
 if __name__ == '__main__':
     pass

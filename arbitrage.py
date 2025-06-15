@@ -133,7 +133,7 @@ def find_arbitrage(combinations, pools):
                 })
 
     return arbitrage
-
+  
 async def main():
     global list_msg
 
@@ -159,7 +159,6 @@ async def main():
                     list_msg.append(msg)
 
                 initial_size = arbitrage['initial_size']
-
                 if not swapped and enable_swap:
                         txId = await trading_api.swap_pool_async(trading_api.get_path(swap_pool), initial_size, gas_price=gas_price)
                         await asyncio.sleep(tx_initial_delay)
@@ -198,6 +197,19 @@ async def main():
 def start():
     threading.Thread(target=send_msg, daemon=True).start()
     asyncio.run(main())
+                                logger.warning(f"ожидаем подтверждение транзакции {txId} | {tx}")
+                                await asyncio.sleep(tx_poll_interval)
+
+                        swapped = True
+            # break
+        except Exception as err:
+            logger.error([err, extract_tb(exc_info()[2])])
+            await asyncio.sleep(3)
+
+def start():
+    threading.Thread(target=send_msg, daemon=True).start()
+    asyncio.run(main())
+
 
 if __name__ == '__main__':
     start()
