@@ -9,7 +9,6 @@ import misc
 from sys import exc_info
 from traceback import extract_tb
 
-count = 0
 
 list_msg = []
 
@@ -54,7 +53,6 @@ def create_combinations(pools, count_th=1):
 
     # coin_sell > coin_buy | USDX → QUOTA → BIP → USDX
     def start(symbols, symbols_th):
-        global count
 
         for symbol in symbols_th:
             coin_buy = symbol.split("/")[0]
@@ -76,7 +74,6 @@ def create_combinations(pools, count_th=1):
                                 if coin_buy2 == coin_sell1 and coin_sell2 == coin_sell:
                                     combinations.append([symbol, symbol1, symbol2])
 
-            count += 1
 
     count_symbols_th = int(count_symbols / count_th)
     if count_symbols_th * count_th < count_symbols: count_symbols_th += 1
@@ -136,16 +133,18 @@ def find_arbitrage(combinations, pools):
                 })
 
     return arbitrage
-
+  
 async def main():
     global list_msg
 
+
     async for pools in trading_api.pools_ws():
         try:
-            stime = time.time()
-            combinations = create_combinations(pools, 1)
 
-            arbitrages = find_arbitrage(combinations, pools)
+            stime = time.time()
+            combinations = await asyncio.to_thread(create_combinations, pools, 1)
+
+            arbitrages = await asyncio.to_thread(find_arbitrage, combinations, pools)
 
             swapped = False
             for arbitrage in arbitrages:
@@ -160,7 +159,6 @@ async def main():
                     list_msg.append(msg)
 
                 initial_size = arbitrage['initial_size']
-
                 if not swapped and enable_swap:
                         txId = await trading_api.swap_pool_async(trading_api.get_path(swap_pool), initial_size, gas_price=gas_price)
                         await asyncio.sleep(tx_initial_delay)
@@ -199,6 +197,19 @@ async def main():
 def start():
     threading.Thread(target=send_msg, daemon=True).start()
     asyncio.run(main())
+                                logger.warning(f"ожидаем подтверждение транзакции {txId} | {tx}")
+                                await asyncio.sleep(tx_poll_interval)
+
+                        swapped = True
+            # break
+        except Exception as err:
+            logger.error([err, extract_tb(exc_info()[2])])
+            await asyncio.sleep(3)
+
+def start():
+    threading.Thread(target=send_msg, daemon=True).start()
+    asyncio.run(main())
+
 
 if __name__ == '__main__':
     start()

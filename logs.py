@@ -1,6 +1,9 @@
 from loguru import logger
 import time
 import sys
+import re
+
+brackets_regex = re.compile(r'<.*?>')
 
 def logging_setup():
 
@@ -22,8 +25,5 @@ def logging_setup():
 def clean_brackets(raw_str):
     clean_text = re.sub(brackets_regex, '', raw_str)
     return clean_text
-
-
-# brackets_regex = re.compile(r'<.*?>')
 
 logging_setup()
